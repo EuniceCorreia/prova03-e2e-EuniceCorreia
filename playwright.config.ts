@@ -7,10 +7,10 @@ const config: PlaywrightTestConfig = {
   use: {
     trace: 'on',
     locale: 'pt-BR',
-    headless: false,
+    headless: !!process.env.CI,
     viewport: { width: 1280, height: 720 },
     launchOptions: {
-      slowMo: 25
+      slowMo: process.env.CI ? 0 : 25
     },
     ignoreHTTPSErrors: true,
     screenshot: 'on',
