@@ -40,11 +40,23 @@ export default class PeersContatoPage extends BasePage {
   }
 
   async acessarAba(nomeAba: string): Promise<void> {
-    const abaFormulario = this.peersElements.getAbaFormulario(nomeAba);
+    const abaFormulario = this.peersElements.getAbaFormulario(nomeAba).first();
 
     await abaFormulario.scrollIntoViewIfNeeded();
+    const idAba = await abaFormulario.getAttribute('id');
+    const idPainel = await abaFormulario.getAttribute('aria-controls');
     await abaFormulario.click();
-    await this.page.waitForTimeout(300);
+
+    if (idPainel) {
+      const painel = this.page.locator(`#${idPainel}`);
+
+      try {
+        await expect(painel).toBeVisible({ timeout: 5000 });
+      } catch {
+        await this.ativarAbaPorDom(idAba, idPainel);
+        await expect(painel).toBeVisible({ timeout: 5000 });
+      }
+    }
   }
 
   async preencherFormularioCarreiras(): Promise<void> {
@@ -59,11 +71,6 @@ export default class PeersContatoPage extends BasePage {
 
     const formulario = this.getFormularioPorUnitTag('wpcf7-f2810-p2806-o2');
 
-    await this.preencherCampo(
-      formulario,
-      'input[name="nome"]',
-      this.dadosFormulario.nome
-    );
     await this.preencherCampo(
       formulario,
       'input[name="email"]',
@@ -83,6 +90,31 @@ export default class PeersContatoPage extends BasePage {
       .locator('select[name="como_conheceu"]')
       .selectOption({ label: this.dadosFormulario.comoConheceu });
     await formulario.locator('input[name="concordo"]').check({ force: true });
+    await this.preencherCampo(
+      formulario,
+      'input[name="nome"]',
+      this.dadosFormulario.nome
+    );
+    await this.definirValorCampo(
+      formulario,
+      'input[name="nome"]',
+      this.dadosFormulario.nome
+    );
+    await this.definirValorCampo(
+      formulario,
+      'input[name="email"]',
+      this.dadosFormulario.email
+    );
+    await this.definirValorCampo(
+      formulario,
+      'input[name="celular"]',
+      this.dadosFormulario.telefone
+    );
+    await this.definirValorCampo(
+      formulario,
+      'input[name="assunto"]',
+      this.dadosFormulario.assunto
+    );
   }
 
   async preencherFormularioFornecedor(): Promise<void> {
@@ -180,6 +212,8 @@ export default class PeersContatoPage extends BasePage {
   private async preencherFormularioSolucoes(
     formulario: Locator
   ): Promise<void> {
+    await expect(formulario).toBeVisible();
+
     await this.preencherCampo(
       formulario,
       'input[name="nome"]',
@@ -234,13 +268,60 @@ export default class PeersContatoPage extends BasePage {
     await campo.fill(valor);
 
     if ((await campo.inputValue()) === '') {
-      await campo.press('Control+A');
-      await campo.press('Backspace');
-      await campo.pressSequentially(valor, { delay: 2 });
+      await this.definirValor(campo, valor);
     }
   }
 
   private formatarTelefone(telefone: string): string {
     return telefone.replace(/(\d{2})(\d{1})(\d{4})(\d{4})/, '($1) $2$3-$4');
+  }
+
+  private async definirValorCampo(
+    formulario: Locator,
+    seletor: string,
+    valor = ''
+  ): Promise<void> {
+    await this.definirValor(formulario.locator(seletor), valor);
+  }
+
+  private async definirValor(campo: Locator, valor: string): Promise<void> {
+    await campo.evaluate((elemento, valorCampo) => {
+      const campoFormulario = elemento as
+        | HTMLInputElement
+        | HTMLTextAreaElement;
+
+      campoFormulario.value = valorCampo;
+      campoFormulario.dispatchEvent(new Event('input', { bubbles: true }));
+      campoFormulario.dispatchEvent(new Event('change', { bubbles: true }));
+    }, valor);
+  }
+
+  private async ativarAbaPorDom(
+    idAba: string | null,
+    idPainel: string
+  ): Promise<void> {
+    await this.page.evaluate(
+      ({ idAba, idPainel }) => {
+        const painel = document.getElementById(idPainel);
+        const aba = idAba ? document.getElementById(idAba) : null;
+        const container = painel?.parentElement;
+        const listaAbas = aba?.parentElement;
+
+        container
+          ?.querySelectorAll('[role="tabpanel"]')
+          .forEach(elemento => elemento.classList.remove('e-active'));
+        listaAbas
+          ?.querySelectorAll('button.e-n-tab-title')
+          .forEach(elemento => {
+            elemento.setAttribute('aria-selected', 'false');
+            elemento.setAttribute('tabindex', '-1');
+          });
+
+        painel?.classList.add('e-active');
+        aba?.setAttribute('aria-selected', 'true');
+        aba?.setAttribute('tabindex', '0');
+      },
+      { idAba, idPainel }
+    );
   }
 }
