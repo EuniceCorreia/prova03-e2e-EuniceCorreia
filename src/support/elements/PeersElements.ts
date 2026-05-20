@@ -46,4 +46,14 @@ export default class PeersElements extends BaseElements {
   getCheckAceite(): Locator {
     return this.page.locator('input[name="concordo"]');
   }
+
+  getBotaoAceitarCookies(): Locator {
+    return this.page.locator('.cmplz-accept');
+  }
+
+  getAbaFormulario(nomeAba: string): Locator {
+    return this.page
+      .locator('button.e-n-tab-title')
+      .filter({ hasText: nomeAba });
+  }
 }
